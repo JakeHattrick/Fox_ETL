@@ -15,7 +15,7 @@ TESTBOARD_XLS_FILENAME = "Test board record report.xls"
 WORKSTATION_FILEPATH = os.path.join(INPUT_DIR, WORKSTATION_XLS_FILENAME)
 TESTBOARD_FILEPATH = os.path.join(INPUT_DIR, TESTBOARD_XLS_FILENAME)
 SNFN_XLS_FILENAME = "snfnReport.xls"
-WORKSTATION_FILEPATH = os.path.join(INPUT_DIR, SNFN_XLS_FILENAME)
+SNFN_FILEPATH = os.path.join(INPUT_DIR, SNFN_XLS_FILENAME)
 
 ETL_V2_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IMPORT_TESTBOARD_SCRIPT = os.path.join(ETL_V2_DIR, "loaders", "import_testboard_file.py")

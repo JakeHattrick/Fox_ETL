@@ -6,14 +6,15 @@ from pathlib import Path
 
 class ScriptOrchestrator:
     def __init__(self):
+        # Define base paths first
+        self.scheduler_dir = Path(__file__).parent  # scheduler folder
+        self.testboard_dir = self.scheduler_dir.parent / "aggregators" / "testboard_agg"
+        self.workstation_dir = self.scheduler_dir.parent / "aggregators" / "workstation_agg"
+        
+        # Now setup logging after paths are defined
         self._setup_logging()
         
-        # Define base paths
-        self.scheduler_dir = Path(__file__).parent  # scheduler folder
-        self.testboard_dir = self.scheduler_dir.parent / "testboard"
-        self.workstation_dir = self.scheduler_dir.parent / "workstation"
-        
-        # Scripts organized by category and order with their respective directories
+        # Rest of your initialization code...
         self.script_groups = {
             'testboard': [
                 self.testboard_dir / 'aggregate_all_time_dedup.py',

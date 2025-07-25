@@ -56,7 +56,7 @@ def aggregate_daily_data(conn):
     # Clear existing data
     cursor.execute("TRUNCATE TABLE workstation_pchart_daily;")
     
-    # Aggregate query
+    # Aggregate query - Updated to match TPY script logic
     query = """
     INSERT INTO workstation_pchart_daily (
         date,
@@ -75,10 +75,12 @@ def aggregate_daily_data(conn):
         workstation_name,
         service_flow,
         COUNT(*) as total_count,
-        SUM(CASE WHEN history_station_passing_status = 'PASS' THEN 1 ELSE 0 END) as pass_count,
-        SUM(CASE WHEN history_station_passing_status = 'FAIL' THEN 1 ELSE 0 END) as fail_count
+        COUNT(CASE WHEN history_station_passing_status = 'Pass' THEN 1 END) as pass_count,
+        COUNT(CASE WHEN history_station_passing_status != 'Pass' THEN 1 END) as fail_count
     FROM workstation_master_log
     WHERE history_station_end_time IS NOT NULL
+        AND service_flow NOT IN ('NC Sort', 'RO')
+        AND service_flow IS NOT NULL
     GROUP BY 
         DATE(history_station_end_time),
         pn,

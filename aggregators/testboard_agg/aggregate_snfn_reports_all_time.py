@@ -76,7 +76,7 @@ def main():
                 history_station_end_time::DATE
             FROM testboard_master_log
             WHERE history_station_end_time IS NOT NULL
-            AND history_station_passing_status = 'FAIL';
+            AND history_station_passing_status = 'Fail';
             
             -- Get count for reporting
             SELECT COUNT(*) FROM temp_snfn_aggregate;

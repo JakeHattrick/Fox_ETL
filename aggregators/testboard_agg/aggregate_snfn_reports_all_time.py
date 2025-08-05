@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS snfn_aggregate_daily (
 '''
 
 AGGREGATE_SQL = '''
-SELECT
+SELECT DISTINCT
     fixture_no,
     workstation_name,
     sn,
@@ -36,8 +36,7 @@ SELECT
     history_station_end_time
 FROM testboard_master_log
 WHERE history_station_end_time IS NOT NULL
-AND history_station_passing_status = 'Fail'
-GROUP BY sn, fixture_no, model, pn, workstation_name, error_code, error_disc, history_station_end_time
+AND history_station_passing_status = 'FAIL'
 ORDER BY history_station_end_time DESC;
 '''
 
@@ -66,21 +65,37 @@ def main():
             print(f"Aggregated {len(rows)} rows.")
 
             if rows:
-                # Match the column order in INSERT_SQL: fixture_no, workstation_name, sn, pn, model, error_code, error_disc, history_station_end_time
-                values = [(
-                    r[0],  # fixture_no
-                    r[1],  # workstation_name
-                    r[2],  # sn
-                    r[3],  # pn
-                    r[4],  # model
-                    r[5],  # error_code
-                    r[6],  # error_disc
-                    r[7]   # history_station_end_time
-                ) for r in rows]
+                # Remove duplicates from the result set to prevent ON CONFLICT issues
+                # Create a set to track unique combinations of primary key fields
+                seen = set()
+                unique_values = []
                 
-                execute_values(cur, INSERT_SQL, values)
-                conn.commit()
-                print("SNFN report aggregation complete and upserted.")
+                for r in rows:
+                    # Primary key: (sn, fixture_no, model, workstation_name, error_code, history_station_end_time)
+                    pk_tuple = (r[2], r[0], r[4], r[1], r[5], r[7])  # sn, fixture_no, model, workstation_name, error_code, history_station_end_time
+                    
+                    if pk_tuple not in seen:
+                        seen.add(pk_tuple)
+                        # Match the column order in INSERT_SQL: fixture_no, workstation_name, sn, pn, model, error_code, error_disc, history_station_end_time
+                        unique_values.append((
+                            r[0],  # fixture_no
+                            r[1],  # workstation_name
+                            r[2],  # sn
+                            r[3],  # pn
+                            r[4],  # model
+                            r[5],  # error_code
+                            r[6],  # error_disc
+                            r[7]   # history_station_end_time
+                        ))
+                
+                print(f"Removed {len(rows) - len(unique_values)} duplicate rows.")
+                
+                if unique_values:
+                    execute_values(cur, INSERT_SQL, unique_values)
+                    conn.commit()
+                    print(f"SNFN report aggregation complete. Upserted {len(unique_values)} unique rows.")
+                else:
+                    print("No unique rows to insert after deduplication.")
             else:
                 print("No data to aggregate.")
                 

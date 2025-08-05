@@ -36,7 +36,7 @@ SELECT DISTINCT
     history_station_end_time
 FROM testboard_master_log
 WHERE history_station_end_time IS NOT NULL
-AND history_station_passing_status = 'Fail'
+AND history_station_passing_status = 'FAIL'
 ORDER BY history_station_end_time DESC;
 '''
 
@@ -59,43 +59,53 @@ def main():
             cur.execute(CREATE_TABLE_SQL)
             conn.commit()
 
-            print("Aggregating snfn report data from testboard_master_log...")
-            cur.execute(AGGREGATE_SQL)
-            rows = cur.fetchall()
-            print(f"Aggregated {len(rows)} rows.")
-
-            if rows:
-                # Remove duplicates from the result set to prevent ON CONFLICT issues
-                # Create a set to track unique combinations of primary key fields
-                seen = set()
-                unique_values = []
+            print("Aggregating and upserting snfn report data using temporary table...")
+            
+            # Use a single SQL operation with temporary table to avoid Python-level deduplication issues
+            upsert_sql = '''
+            -- Create temporary table with aggregated data
+            CREATE TEMP TABLE temp_snfn_aggregate AS
+            SELECT DISTINCT
+                fixture_no,
+                workstation_name,
+                sn,
+                pn,
+                model,
+                CONCAT('EC', RIGHT(failure_reasons, 3)) AS error_code,
+                failure_note AS error_disc,
+                history_station_end_time::DATE
+            FROM testboard_master_log
+            WHERE history_station_end_time IS NOT NULL
+            AND history_station_passing_status = 'FAIL';
+            
+            -- Get count for reporting
+            SELECT COUNT(*) FROM temp_snfn_aggregate;
+            '''
+            
+            cur.execute(upsert_sql)
+            count_result = cur.fetchone()
+            rows_to_process = count_result[0] if count_result else 0
+            print(f"Found {rows_to_process} unique rows to process.")
+            
+            if rows_to_process > 0:
+                # Now upsert from temp table to main table
+                final_upsert_sql = '''
+                INSERT INTO snfn_aggregate_daily (
+                    fixture_no, workstation_name, sn, pn, model, error_code, error_disc, history_station_end_time
+                )
+                SELECT 
+                    fixture_no, workstation_name, sn, pn, model, error_code, error_disc, history_station_end_time
+                FROM temp_snfn_aggregate
+                ON CONFLICT (sn, fixture_no, model, workstation_name, error_code, history_station_end_time) 
+                DO UPDATE SET
+                    error_code = EXCLUDED.error_code,
+                    error_disc = EXCLUDED.error_disc,
+                    pn = EXCLUDED.pn;
+                '''
                 
-                for r in rows:
-                    # Primary key: (sn, fixture_no, model, workstation_name, error_code, history_station_end_time)
-                    pk_tuple = (r[2], r[0], r[4], r[1], r[5], r[7])  # sn, fixture_no, model, workstation_name, error_code, history_station_end_time
-                    
-                    if pk_tuple not in seen:
-                        seen.add(pk_tuple)
-                        # Match the column order in INSERT_SQL: fixture_no, workstation_name, sn, pn, model, error_code, error_disc, history_station_end_time
-                        unique_values.append((
-                            r[0],  # fixture_no
-                            r[1],  # workstation_name
-                            r[2],  # sn
-                            r[3],  # pn
-                            r[4],  # model
-                            r[5],  # error_code
-                            r[6],  # error_disc
-                            r[7]   # history_station_end_time
-                        ))
-                
-                print(f"Removed {len(rows) - len(unique_values)} duplicate rows.")
-                
-                if unique_values:
-                    execute_values(cur, INSERT_SQL, unique_values)
-                    conn.commit()
-                    print(f"SNFN report aggregation complete. Upserted {len(unique_values)} unique rows.")
-                else:
-                    print("No unique rows to insert after deduplication.")
+                cur.execute(final_upsert_sql)
+                conn.commit()
+                print(f"SNFN report aggregation complete. Processed {rows_to_process} rows.")
             else:
                 print("No data to aggregate.")
                 

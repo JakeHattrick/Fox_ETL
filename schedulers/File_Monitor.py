@@ -12,9 +12,10 @@ INPUT_DIR = "/home/darvin/Fox_ETL/input"
 
 WORKSTATION_XLS_FILENAME = "workstationOutputReport.xls"
 TESTBOARD_XLS_FILENAME = "Test board record report.xls"
+SNFN_XLS_FILENAME = "snfnReport.xls"
 WORKSTATION_FILEPATH = os.path.join(INPUT_DIR, WORKSTATION_XLS_FILENAME)
 TESTBOARD_FILEPATH = os.path.join(INPUT_DIR, TESTBOARD_XLS_FILENAME)
-SNFN_XLS_FILENAME = "snfnReport.xls"
+
 SNFN_FILEPATH = os.path.join(INPUT_DIR, SNFN_XLS_FILENAME)
 
 ETL_V2_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -140,13 +141,12 @@ def monitor_for_files():
                 if success:
                     logger.info(f"Test board file processing completed successfully")
                 else:
-                    logger.error(f"Test board file processing failed")
+                    logger.error(f"❌ STEP 3: Test board file processing failed")
 
-            time.sleep(10)
-
+            # Check for snfn report
             if os.path.exists(SNFN_FILEPATH):
-                logger.info(f"SnFn file detected: {SNFN_XLS_FILENAME} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                logger.info(f"Starting SnFn file processing pipeline...")
+                logger.info(f"📋 STEP 1: SnfN file detected: {SNFN_XLS_FILENAME} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info(f"🔄 STEP 2: Starting SnFn file processing pipeline...")
                 
                 success = process_file(
                     SNFN_FILEPATH, 
@@ -155,11 +155,11 @@ def monitor_for_files():
                 )
                 
                 if success:
-                    logger.info(f"SnFn file processing completed successfully")
+                    logger.info(f"✅ STEP 3: snfn file processing completed successfully")
                 else:
-                    logger.error(f"SnFn file processing failed")
-
-            time.sleep(10)
+                    logger.error(f"❌ STEP 3: snfn file processing failed")
+                
+            time.sleep(10)  # Check every 10 seconds
             
         except KeyboardInterrupt:
             logger.info("File monitor shutdown requested")
@@ -169,6 +169,7 @@ def monitor_for_files():
             import traceback
             logger.error(traceback.format_exc())
             time.sleep(10)
+
 
 if __name__ == "__main__":
     monitor_for_files() 

@@ -36,7 +36,7 @@ SELECT
     history_station_end_time
 FROM testboard_master_log
 WHERE history_station_end_time IS NOT NULL
-AND history_station_passing_status = "Fail"
+AND history_station_passing_status = 'Fail'
 GROUP BY sn, fixture_no, model, pn, workstation_name, error_code, error_disc, history_station_end_time
 ORDER BY history_station_end_time DESC;
 '''

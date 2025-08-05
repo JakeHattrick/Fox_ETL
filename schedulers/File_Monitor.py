@@ -15,6 +15,7 @@ TESTBOARD_XLS_FILENAME = "Test board record report.xls"
 SNFN_XLS_FILENAME = "snfnReport.xls"
 WORKSTATION_FILEPATH = os.path.join(INPUT_DIR, WORKSTATION_XLS_FILENAME)
 TESTBOARD_FILEPATH = os.path.join(INPUT_DIR, TESTBOARD_XLS_FILENAME)
+
 SNFN_FILEPATH = os.path.join(INPUT_DIR, SNFN_XLS_FILENAME)
 
 ETL_V2_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -107,8 +108,8 @@ def process_file(file_path, script_path, file_type):
 def monitor_for_files():
     logger.info("Starting file monitor for PostgreSQL ETL pipeline")
     logger.info(f"Monitoring directory: {INPUT_DIR}")
-    logger.info(f"Target files: {WORKSTATION_XLS_FILENAME}, {TESTBOARD_XLS_FILENAME}")
-    logger.info(f"Import scripts: {os.path.basename(IMPORT_WORKSTATION_SCRIPT)}, {os.path.basename(IMPORT_TESTBOARD_SCRIPT)}")
+    logger.info(f"Target files: {WORKSTATION_XLS_FILENAME}, {TESTBOARD_XLS_FILENAME},{SNFN_XLS_FILENAME}")
+    logger.info(f"Import scripts: {os.path.basename(IMPORT_WORKSTATION_SCRIPT)}, {os.path.basename(IMPORT_TESTBOARD_SCRIPT)}, {os.path.basename(IMPORT_SNFN_SCRIPT)}")
     
     while True:
         try:

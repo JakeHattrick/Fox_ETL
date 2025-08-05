@@ -36,7 +36,7 @@ SELECT DISTINCT
     history_station_end_time
 FROM testboard_master_log
 WHERE history_station_end_time IS NOT NULL
-AND history_station_passing_status = 'FAIL'
+AND history_station_passing_status = 'Fail'
 ORDER BY history_station_end_time DESC;
 '''
 

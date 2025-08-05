@@ -59,43 +59,20 @@ def main():
             cur.execute(CREATE_TABLE_SQL)
             conn.commit()
 
-            print("Aggregating and upserting snfn report data using temporary table...")
-            
-            # Use a single SQL operation with temporary table to avoid Python-level deduplication issues
-            upsert_sql = '''
-            -- Create temporary table with aggregated data
-            CREATE TEMP TABLE temp_snfn_aggregate AS
-            SELECT DISTINCT
-                fixture_no,
-                workstation_name,
-                sn,
-                pn,
-                model,
-                CONCAT('EC', RIGHT(failure_reasons, 3)) AS error_code,
-                failure_note AS error_disc,
-                history_station_end_time::DATE
-            FROM testboard_master_log
-            WHERE history_station_end_time IS NOT NULL
-            AND history_station_passing_status = 'Fail';
-            
-            -- Get count for reporting
-            SELECT COUNT(*) FROM temp_snfn_aggregate;
-            '''
-            
-            cur.execute(upsert_sql)
-            count_result = cur.fetchone()
-            rows_to_process = count_result[0] if count_result else 0
-            print(f"Found {rows_to_process} unique rows to process.")
-            
-            if rows_to_process > 0:
-                # Now upsert from temp table to main table
-                final_upsert_sql = '''
+            print("Aggregating snfn report data from testboard_master_log...")
+            cur.execute(AGGREGATE_SQL)
+            rows = cur.fetchall()
+            print(f"Aggregated {len(rows)} rows.")
+
+            if rows:
+                # Process rows one by one to avoid bulk insert conflicts
+                success_count = 0
+                error_count = 0
+                
+                single_insert_sql = '''
                 INSERT INTO snfn_aggregate_daily (
                     fixture_no, workstation_name, sn, pn, model, error_code, error_disc, history_station_end_time
-                )
-                SELECT 
-                    fixture_no, workstation_name, sn, pn, model, error_code, error_disc, history_station_end_time
-                FROM temp_snfn_aggregate
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (sn, fixture_no, model, workstation_name, error_code, history_station_end_time) 
                 DO UPDATE SET
                     error_code = EXCLUDED.error_code,
@@ -103,9 +80,29 @@ def main():
                     pn = EXCLUDED.pn;
                 '''
                 
-                cur.execute(final_upsert_sql)
+                for r in rows:
+                    try:
+                        cur.execute(single_insert_sql, (
+                            r[0],  # fixture_no
+                            r[1],  # workstation_name
+                            r[2],  # sn
+                            r[3],  # pn
+                            r[4],  # model
+                            r[5],  # error_code
+                            r[6],  # error_disc
+                            r[7]   # history_station_end_time
+                        ))
+                        success_count += 1
+                    except Exception as row_error:
+                        print(f"Error processing row {r}: {row_error}")
+                        error_count += 1
+                        # Continue with next row instead of rolling back everything
+                        conn.rollback()
+                        # Start a new transaction
+                        cur = conn.cursor()
+                
                 conn.commit()
-                print(f"SNFN report aggregation complete. Processed {rows_to_process} rows.")
+                print(f"SNFN report aggregation complete. Successfully processed {success_count} rows, {error_count} errors.")
             else:
                 print("No data to aggregate.")
                 

@@ -60,9 +60,7 @@ def main():
 
             print("Aggregating all historical packing data...")
             cur.execute(AGGREGATE_SQL)
-            rows = cur.fetchall()
-            print(f"Aggregated {len(rows)} rows.")
-
+            conn.commit()
             rows_affected = cur.rowcount
             print(f"Aggregated and upserted {rows_affected} records.")
     except Exception as e:

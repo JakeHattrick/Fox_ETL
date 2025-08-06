@@ -64,9 +64,7 @@ def main():
 
             print("Aggregating all packing data from workstation_master_log with business rule for weekends...")
             cur.execute(AGGREGATE_SQL)
-            rows = cur.fetchall()
-            print(f"Aggregated {len(rows)} rows.")
-
+            conn.commit()
             rows_affected = cur.rowcount
             print(f"Aggregated and inserted {rows_affected} records.")
     except Exception as e:

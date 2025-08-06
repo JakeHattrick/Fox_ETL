@@ -38,6 +38,7 @@ SELECT
 FROM workstation_master_log
 WHERE workstation_name = 'PACKING'
   AND history_station_passing_status = 'Pass'
+  AND history_station_end_time >= CURRENT_DATE - INTERVAL '7 days'
 GROUP BY pack_date, model, part_number
 ORDER BY model, part_number, pack_date;
 '''

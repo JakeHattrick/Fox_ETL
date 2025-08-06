@@ -42,20 +42,14 @@ SELECT
     model,
     jsonb_object_agg(
         part_number,
-        jsonb_object_agg(
-            pack_date::text,
-            packed_count
-        ) ORDER BY pack_date
+        (
+            SELECT jsonb_object_agg(pack_date::text, packed_count)
+            FROM daily_counts dc2
+            WHERE dc2.model = dc1.model 
+            AND dc2.part_number = dc1.part_number
+        )
     ) AS part_data
-FROM (
-    SELECT 
-        model,
-        part_number,
-        pack_date,
-        packed_count
-    FROM daily_counts
-    ORDER BY pack_date
-) sorted_data
+FROM daily_counts dc1
 GROUP BY model
 ORDER BY model;
 '''

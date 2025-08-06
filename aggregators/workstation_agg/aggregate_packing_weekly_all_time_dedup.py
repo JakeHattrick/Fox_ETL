@@ -58,6 +58,10 @@ def main():
             cur.execute(CREATE_TABLE_SQL)
             conn.commit()
 
+            print("Truncating packing_daily_summary table...")
+            cur.execute('TRUNCATE TABLE packing_daily_summary;')
+            conn.commit()
+
             print("Aggregating all historical packing data...")
             cur.execute(AGGREGATE_SQL)
             conn.commit()

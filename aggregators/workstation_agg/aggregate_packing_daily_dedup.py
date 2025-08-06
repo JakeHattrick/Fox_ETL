@@ -23,20 +23,41 @@ CREATE TABLE IF NOT EXISTS packing_daily_summary (
 TRUNCATE_TABLE_SQL = 'TRUNCATE TABLE packing_daily_summary;'
 
 AGGREGATE_SQL = '''
-SELECT
-    CASE
-        WHEN EXTRACT(DOW FROM history_station_end_time) = 6 THEN DATE(history_station_end_time) - INTERVAL '1 day'  -- Saturday to Friday
-        WHEN EXTRACT(DOW FROM history_station_end_time) = 0 THEN DATE(history_station_end_time) - INTERVAL '2 days'  -- Sunday to Friday
-        ELSE DATE(history_station_end_time)
-    END AS pack_date,
+WITH daily_counts AS (
+    SELECT
+        CASE
+            WHEN EXTRACT(DOW FROM history_station_end_time) = 6 THEN DATE(history_station_end_time) - INTERVAL '1 day'  -- Saturday to Friday
+            WHEN EXTRACT(DOW FROM history_station_end_time) = 0 THEN DATE(history_station_end_time) - INTERVAL '2 days'  -- Sunday to Friday
+            ELSE DATE(history_station_end_time)
+        END AS pack_date,
+        model,
+        pn AS part_number,
+        COUNT(*) AS packed_count
+    FROM workstation_master_log
+    WHERE workstation_name = 'PACKING'
+      AND history_station_passing_status = 'Pass'
+    GROUP BY pack_date, model, part_number
+)
+SELECT 
     model,
-    pn AS part_number,
-    COUNT(*) AS packed_count
-FROM workstation_master_log
-WHERE workstation_name = 'PACKING'
-  AND history_station_passing_status = 'Pass'
-GROUP BY pack_date, model, part_number
-ORDER BY pack_date, model, part_number;
+    jsonb_object_agg(
+        part_number,
+        jsonb_object_agg(
+            pack_date::text,
+            packed_count
+        ) ORDER BY pack_date
+    ) AS part_data
+FROM (
+    SELECT 
+        model,
+        part_number,
+        pack_date,
+        packed_count
+    FROM daily_counts
+    ORDER BY pack_date
+) sorted_data
+GROUP BY model
+ORDER BY model;
 '''
 
 INSERT_SQL = '''

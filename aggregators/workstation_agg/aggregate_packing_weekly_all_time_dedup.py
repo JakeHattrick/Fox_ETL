@@ -21,35 +21,25 @@ CREATE TABLE IF NOT EXISTS packing_daily_summary (
 '''
 
 AGGREGATE_SQL = '''
-WITH daily_counts AS (
-    SELECT
-        CASE
-            WHEN EXTRACT(DOW FROM history_station_end_time) = 6 THEN DATE(history_station_end_time) - INTERVAL '1 day'  -- Saturday to Friday
-            WHEN EXTRACT(DOW FROM history_station_end_time) = 0 THEN DATE(history_station_end_time) - INTERVAL '2 days'  -- Sunday to Friday
-            ELSE DATE(history_station_end_time)
-        END AS pack_date,
-        model,
-        pn AS part_number,
-        COUNT(*) AS packed_count
-    FROM workstation_master_log
-    WHERE workstation_name = 'PACKING'
-      AND history_station_passing_status = 'Pass'
-    GROUP BY pack_date, model, part_number
+INSERT INTO packing_daily_summary (
+    pack_date, model, part_number, packed_count
 )
-SELECT 
+SELECT
+    CASE
+        WHEN EXTRACT(DOW FROM history_station_end_time) = 6 THEN DATE(history_station_end_time) - INTERVAL '1 day'  -- Saturday to Friday
+        WHEN EXTRACT(DOW FROM history_station_end_time) = 0 THEN DATE(history_station_end_time) - INTERVAL '2 days'  -- Sunday to Friday
+        ELSE DATE(history_station_end_time)
+    END AS pack_date,
     model,
-    jsonb_object_agg(
-        part_number,
-        (
-            SELECT jsonb_object_agg(pack_date::text, packed_count)
-            FROM daily_counts dc2
-            WHERE dc2.model = dc1.model 
-            AND dc2.part_number = dc1.part_number
-        )
-    ) AS part_data
-FROM daily_counts dc1
-GROUP BY model
-ORDER BY model;
+    pn AS part_number,
+    COUNT(*) AS packed_count
+FROM workstation_master_log
+WHERE workstation_name = 'PACKING'
+  AND history_station_passing_status = 'Pass'
+GROUP BY pack_date, model, part_number
+ORDER BY model, part_number, pack_date
+ON CONFLICT (pack_date, model, part_number) DO UPDATE SET
+    packed_count = EXCLUDED.packed_count;
 '''
 
 INSERT_SQL = '''
@@ -73,15 +63,8 @@ def main():
             rows = cur.fetchall()
             print(f"Aggregated {len(rows)} rows.")
 
-            if rows:
-                values = [(
-                    r[0], r[1], r[2], r[3]
-                ) for r in rows]
-                execute_values(cur, INSERT_SQL, values)
-                conn.commit()
-                print("All-time packing aggregation complete, data deduplicated and upserted.")
-            else:
-                print("No data to aggregate.")
+            rows_affected = cur.rowcount
+            print(f"Aggregated and upserted {rows_affected} records.")
     except Exception as e:
         print(f"Error: {e}")
         conn.rollback()

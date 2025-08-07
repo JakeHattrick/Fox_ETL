@@ -12,7 +12,208 @@ DB_CONFIG = {
     'port': '5432'
 }
 
-# [Previous functions remain the same until aggregate_weekly_tpy_for_week]
+def get_week_bounds(target_date):
+    """Get the Monday (start) and Sunday (end) of the week containing target_date"""
+    days_since_monday = target_date.weekday()
+    week_start = target_date - timedelta(days=days_since_monday)
+    week_end = week_start + timedelta(days=6)
+    return week_start, week_end
+
+def get_week_id(target_date):
+    """Generate week ID like '2025-W22' for the week containing target_date"""
+    year, week_num, _ = target_date.isocalendar()
+    return f"{year}-W{week_num:02d}"
+
+def calculate_weekly_first_pass_yield_from_raw(week_start, week_end):
+    """Calculate WEEKLY first pass yield using raw data"""
+    conn = psycopg2.connect(**DB_CONFIG)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                WITH part_analysis AS (
+                    SELECT 
+                        sn,
+                        model,
+                        COUNT(CASE WHEN workstation_name = 'PACKING' THEN 1 END) as reached_packing,
+                        COUNT(CASE WHEN history_station_passing_status != 'Pass' THEN 1 END) as failure_count
+                    FROM workstation_master_log
+                    WHERE history_station_end_time >= %s 
+                        AND history_station_end_time < %s
+                        AND service_flow NOT IN ('NC Sort', 'RO')
+                        AND service_flow IS NOT NULL
+                    GROUP BY sn, model
+                )
+                SELECT 
+                    COUNT(*) as parts_started,
+                    COUNT(CASE WHEN reached_packing > 0 AND failure_count = 0 THEN 1 END) as first_pass_success,
+                    COUNT(CASE WHEN reached_packing > 0 THEN 1 END) as parts_completed,
+                    COUNT(CASE WHEN failure_count > 0 THEN 1 END) as parts_failed,
+                    COUNT(CASE WHEN reached_packing = 0 AND failure_count = 0 THEN 1 END) as parts_stuck_in_limbo
+                FROM part_analysis;
+            """, (week_start, week_end + timedelta(days=1)))
+            
+            result = cur.fetchone()
+            if result and result[0] > 0:
+                parts_started, first_pass_success, parts_completed, parts_failed, parts_stuck = result
+                traditional_fpy = (first_pass_success / parts_started * 100) if parts_started > 0 else 0
+                active_parts = parts_completed + parts_failed
+                completed_only_fpy = (first_pass_success / active_parts * 100) if active_parts > 0 else 0
+                
+                return {
+                    "traditional": {
+                        "partsStarted": parts_started,
+                        "firstPassSuccess": first_pass_success,
+                        "firstPassYield": round(traditional_fpy, 2)
+                    },
+                    "completedOnly": {
+                        "activeParts": active_parts,
+                        "firstPassSuccess": first_pass_success,
+                        "firstPassYield": round(completed_only_fpy, 2)
+                    },
+                    "breakdown": {
+                        "partsCompleted": parts_completed,
+                        "partsFailed": parts_failed,
+                        "partsStuckInLimbo": parts_stuck,
+                        "totalParts": parts_started
+                    }
+                }
+            else:
+                return {
+                    "traditional": {"partsStarted": 0, "firstPassSuccess": 0, "firstPassYield": 0},
+                    "completedOnly": {"activeParts": 0, "firstPassSuccess": 0, "firstPassYield": 0},
+                    "breakdown": {"partsCompleted": 0, "partsFailed": 0, "partsStuckInLimbo": 0, "totalParts": 0}
+                }
+    finally:
+        conn.close()
+
+def calculate_model_specific_throughput_yields(week_start, week_end):
+    """Calculate MODEL-SPECIFIC throughput yields from raw data"""
+    conn = psycopg2.connect(**DB_CONFIG)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 
+                    model,
+                    workstation_name,
+                    COUNT(*) as total_parts,
+                    COUNT(CASE WHEN history_station_passing_status = 'Pass' THEN 1 END) as passed_parts,
+                    COUNT(CASE WHEN history_station_passing_status != 'Pass' THEN 1 END) as failed_parts
+                FROM workstation_master_log 
+                WHERE history_station_end_time >= %s 
+                    AND history_station_end_time < %s
+                    AND service_flow NOT IN ('NC Sort', 'RO')
+                    AND service_flow IS NOT NULL
+                    AND (model IN ('Tesla SXM4', 'Tesla SXM5') OR model = 'SXM6')
+                GROUP BY model, workstation_name
+                HAVING COUNT(*) >= 1
+                ORDER BY model, total_parts DESC;
+            """, (week_start, week_end + timedelta(days=1)))
+            
+            results = cur.fetchall()
+            model_specific_yields = {"overall": {}}
+            
+            for model, station, total, passed, failed in results:
+                throughput_yield = (passed / total * 100) if total > 0 else 0
+                
+                if model not in model_specific_yields:
+                    model_specific_yields[model] = {}
+                
+                model_specific_yields[model][station] = {
+                    "totalParts": total,
+                    "passedParts": passed,
+                    "failedParts": failed,
+                    "throughputYield": round(throughput_yield, 2)
+                }
+                
+                if station not in model_specific_yields["overall"]:
+                    model_specific_yields["overall"][station] = {"totalParts": 0, "passedParts": 0, "failedParts": 0}
+                
+                model_specific_yields["overall"][station]["totalParts"] += total
+                model_specific_yields["overall"][station]["passedParts"] += passed
+                model_specific_yields["overall"][station]["failedParts"] += failed
+            
+            for station in model_specific_yields["overall"]:
+                total = model_specific_yields["overall"][station]["totalParts"]
+                passed = model_specific_yields["overall"][station]["passedParts"]
+                throughput_yield = (passed / total * 100) if total > 0 else 0
+                model_specific_yields["overall"][station]["throughputYield"] = round(throughput_yield, 2)
+            
+            return model_specific_yields
+    finally:
+        conn.close()
+
+def calculate_hardcoded_tpy(model_yields):
+    """Calculate hardcoded 4-station TPY"""
+    hardcoded_tpy = {
+        "SXM4": {"stations": {}, "tpy": None},
+        "SXM5": {"stations": {}, "tpy": None},
+        "SXM6": {"stations": {}, "tpy": None}
+    }
+    
+    # SXM4 formula: VI2 × ASSY2 × FI × FQC
+    sxm4_stations = ["VI2", "ASSY2", "FI", "FQC"]
+    sxm4_values = []
+    
+    for station in sxm4_stations:
+        if "Tesla SXM4" in model_yields and station in model_yields["Tesla SXM4"]:
+            yield_pct = model_yields["Tesla SXM4"][station]["throughputYield"]
+            hardcoded_tpy["SXM4"]["stations"][station] = yield_pct
+            sxm4_values.append(yield_pct / 100.0)
+    
+    if len(sxm4_values) == 4:
+        tpy_value = 1.0
+        for val in sxm4_values:
+            tpy_value *= val
+        hardcoded_tpy["SXM4"]["tpy"] = round(tpy_value * 100, 2)
+    
+    # SXM5/6 formula: BBD × ASSY2 × FI × FQC
+    sxm5_stations = ["BBD", "ASSY2", "FI", "FQC"]
+    
+    for model_name in ["SXM5", "SXM6"]:
+        model_key = f"Tesla {model_name}" if model_name == "SXM5" else model_name
+        values = []
+        
+        for station in sxm5_stations:
+            if model_key in model_yields and station in model_yields[model_key]:
+                yield_pct = model_yields[model_key][station]["throughputYield"]
+                hardcoded_tpy[model_name]["stations"][station] = yield_pct
+                values.append(yield_pct / 100.0)
+        
+        if len(values) == 4:
+            tpy_value = 1.0
+            for val in values:
+                tpy_value *= val
+            hardcoded_tpy[model_name]["tpy"] = round(tpy_value * 100, 2)
+    
+    return hardcoded_tpy
+
+def calculate_dynamic_tpy(model_yields):
+    """Calculate DYNAMIC all-stations TPY per model"""
+    dynamic_tpy = {
+        "SXM4": {"stations": {}, "tpy": None, "stationCount": 0},
+        "SXM5": {"stations": {}, "tpy": None, "stationCount": 0},
+        "SXM6": {"stations": {}, "tpy": None, "stationCount": 0}
+    }
+    
+    model_mappings = {
+        "SXM4": "Tesla SXM4",
+        "SXM5": "Tesla SXM5",
+        "SXM6": "SXM6"
+    }
+    
+    for model_short, model_full in model_mappings.items():
+        if model_full in model_yields:
+            stations = model_yields[model_full]
+            dynamic_tpy[model_short]["stations"] = {station: data["throughputYield"] for station, data in stations.items()}
+            dynamic_tpy[model_short]["stationCount"] = len(stations)
+            
+            if stations:
+                tpy_value = 1.0
+                for yield_pct in dynamic_tpy[model_short]["stations"].values():
+                    tpy_value *= (yield_pct / 100.0)
+                dynamic_tpy[model_short]["tpy"] = round(tpy_value * 100, 2)
+    
+    return dynamic_tpy
 
 def aggregate_weekly_tpy_for_week(week_id):
     """Aggregate weekly TPY metrics for a specific week"""

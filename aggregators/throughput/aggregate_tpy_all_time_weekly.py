@@ -377,4 +377,68 @@ def aggregate_weekly_tpy_for_week(week_id):
     finally:
         conn.close()
 
-# [Rest of the file remains the same]
+def get_all_available_weeks():
+    """Get all unique weeks when actual testing occurred"""
+    print("Finding all weeks with test activity...")
+    
+    conn = psycopg2.connect(**DB_CONFIG)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT DATE(history_station_end_time) as test_date
+                FROM workstation_master_log
+                WHERE history_station_end_time IS NOT NULL
+                    AND service_flow NOT IN ('NC Sort', 'RO')
+                    AND service_flow IS NOT NULL
+                ORDER BY test_date;
+            """)
+            
+            dates = [row[0] for row in cur.fetchall()]
+            if not dates:
+                return []
+            
+            weeks = set()
+            for date in dates:
+                weeks.add(get_week_id(date))
+            
+            weeks = sorted(list(weeks))
+            print(f"  Found {len(weeks)} weeks with test activity from {weeks[0]} to {weeks[-1]}")
+            return weeks
+    finally:
+        conn.close()
+
+def aggregate_weekly_tpy_metrics_all_time():
+    """Aggregate weekly TPY metrics for all historical dates"""
+    print("WEEKLY TPY METRICS ALL-TIME AGGREGATOR")
+    print("=" * 50)
+    
+    # Get all available weeks
+    all_weeks = get_all_available_weeks()
+    
+    if not all_weeks:
+        print("No valid weeks found in the dataset")
+        return
+    
+    print(f"\nProcessing ALL {len(all_weeks)} historical weeks...")
+    
+    success_count = 0
+    error_count = 0
+    
+    for i, week_id in enumerate(all_weeks, 1):
+        try:
+            print(f"\nProcessing {i}/{len(all_weeks)}: {week_id}")
+            print("-" * 50)
+            
+            aggregate_weekly_tpy_for_week(week_id)
+            success_count += 1
+            
+        except Exception as e:
+            print(f"ERROR processing {week_id}: {str(e)}")
+            error_count += 1
+    
+    print(f"\nWEEKLY TPY ALL-TIME AGGREGATION COMPLETE!")
+    print(f"Successfully processed: {success_count} weeks")
+    print(f"Errors: {error_count} weeks")
+
+if __name__ == "__main__":
+    aggregate_weekly_tpy_metrics_all_time()

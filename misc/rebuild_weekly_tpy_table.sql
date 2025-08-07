@@ -1,8 +1,7 @@
--- Backup existing data
-CREATE TABLE weekly_tpy_metrics_backup AS SELECT * FROM weekly_tpy_metrics;
-
--- Drop existing table
-DROP TABLE weekly_tpy_metrics;
+-- Drop existing tables if they exist
+DROP TABLE IF EXISTS weekly_tpy_model_metrics;
+DROP TABLE IF EXISTS weekly_tpy_metrics;
+DROP TABLE IF EXISTS weekly_tpy_metrics_backup;
 
 -- Create new main metrics table
 CREATE TABLE weekly_tpy_metrics (
@@ -71,109 +70,6 @@ CREATE TABLE weekly_tpy_model_metrics (
     FOREIGN KEY (week_id) REFERENCES weekly_tpy_metrics(week_id) ON DELETE CASCADE
 );
 
--- Migrate main metrics data
-INSERT INTO weekly_tpy_metrics (
-    week_id,
-    week_start,
-    week_end,
-    days_in_week,
-    weekly_first_pass_yield_traditional_parts_started,
-    weekly_first_pass_yield_traditional_first_pass_success,
-    weekly_first_pass_yield_traditional_first_pass_yield,
-    weekly_first_pass_yield_completed_only_active_parts,
-    weekly_first_pass_yield_completed_only_first_pass_success,
-    weekly_first_pass_yield_completed_only_first_pass_yield,
-    weekly_first_pass_yield_breakdown_parts_completed,
-    weekly_first_pass_yield_breakdown_parts_failed,
-    weekly_first_pass_yield_breakdown_parts_stuck_in_limbo,
-    weekly_first_pass_yield_breakdown_total_parts,
-    weekly_overall_yield_total_parts,
-    weekly_overall_yield_completed_parts,
-    weekly_overall_yield_overall_yield,
-    weekly_throughput_yield_station_metrics,
-    weekly_throughput_yield_average_yield,
-    total_stations,
-    best_station_name,
-    best_station_yield,
-    worst_station_name,
-    worst_station_yield,
-    created_at
-)
-SELECT 
-    week_id,
-    week_start,
-    week_end,
-    days_in_week,
-    weekly_first_pass_yield_traditional_parts_started,
-    weekly_first_pass_yield_traditional_first_pass_success,
-    weekly_first_pass_yield_traditional_first_pass_yield,
-    weekly_first_pass_yield_completed_only_active_parts,
-    weekly_first_pass_yield_completed_only_first_pass_success,
-    weekly_first_pass_yield_completed_only_first_pass_yield,
-    weekly_first_pass_yield_breakdown_parts_completed,
-    weekly_first_pass_yield_breakdown_parts_failed,
-    weekly_first_pass_yield_breakdown_parts_stuck_in_limbo,
-    weekly_first_pass_yield_breakdown_total_parts,
-    weekly_overall_yield_total_parts,
-    weekly_overall_yield_completed_parts,
-    weekly_overall_yield_overall_yield,
-    weekly_throughput_yield_station_metrics,
-    weekly_throughput_yield_average_yield,
-    total_stations,
-    best_station_name,
-    best_station_yield,
-    worst_station_name,
-    worst_station_yield,
-    created_at
-FROM weekly_tpy_metrics_backup;
-
--- Migrate SXM4 data
-INSERT INTO weekly_tpy_model_metrics (
-    week_id,
-    model,
-    hardcoded_stations,
-    hardcoded_tpy,
-    dynamic_stations,
-    dynamic_tpy,
-    dynamic_station_count
-)
-SELECT 
-    week_id,
-    'Tesla SXM4',
-    weekly_tpy_hardcoded_sxm4_stations,
-    weekly_tpy_hardcoded_sxm4_tpy,
-    weekly_tpy_dynamic_sxm4_stations,
-    weekly_tpy_dynamic_sxm4_tpy,
-    weekly_tpy_dynamic_sxm4_station_count
-FROM weekly_tpy_metrics_backup
-WHERE weekly_tpy_hardcoded_sxm4_stations IS NOT NULL 
-   OR weekly_tpy_dynamic_sxm4_stations IS NOT NULL;
-
--- Migrate SXM5 data
-INSERT INTO weekly_tpy_model_metrics (
-    week_id,
-    model,
-    hardcoded_stations,
-    hardcoded_tpy,
-    dynamic_stations,
-    dynamic_tpy,
-    dynamic_station_count
-)
-SELECT 
-    week_id,
-    'Tesla SXM5',
-    weekly_tpy_hardcoded_sxm5_stations,
-    weekly_tpy_hardcoded_sxm5_tpy,
-    weekly_tpy_dynamic_sxm5_stations,
-    weekly_tpy_dynamic_sxm5_tpy,
-    weekly_tpy_dynamic_sxm5_station_count
-FROM weekly_tpy_metrics_backup
-WHERE weekly_tpy_hardcoded_sxm5_stations IS NOT NULL 
-   OR weekly_tpy_dynamic_sxm5_stations IS NOT NULL;
-
--- Verify the migration
+-- Verify tables are empty
 SELECT COUNT(*) as total_weeks FROM weekly_tpy_metrics;
-SELECT model, COUNT(*) as records FROM weekly_tpy_model_metrics GROUP BY model;
-
--- If everything looks good, you can drop the backup table:
--- DROP TABLE weekly_tpy_metrics_backup;
+SELECT COUNT(*) as total_model_records FROM weekly_tpy_model_metrics;

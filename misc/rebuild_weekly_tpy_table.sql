@@ -4,7 +4,7 @@ CREATE TABLE weekly_tpy_metrics_backup AS SELECT * FROM weekly_tpy_metrics;
 -- Drop existing table
 DROP TABLE weekly_tpy_metrics;
 
--- Create new flexible structure
+-- Create new main metrics table
 CREATE TABLE weekly_tpy_metrics (
     -- Primary key and time identifiers
     week_id character varying(10) PRIMARY KEY,
@@ -34,9 +34,8 @@ CREATE TABLE weekly_tpy_metrics (
     weekly_overall_yield_overall_yield numeric(5,2),
     
     -- Weekly throughput yield metrics
-    weekly_throughput_yield_station_metrics jsonb,
+    weekly_throughput_yield_station_metrics text,
     weekly_throughput_yield_average_yield numeric(5,2),
-    weekly_throughput_yield_model_specific jsonb,  -- Store all model data here
     
     -- Station metrics
     total_stations integer,
@@ -49,7 +48,30 @@ CREATE TABLE weekly_tpy_metrics (
     created_at timestamp without time zone DEFAULT now()
 );
 
--- Migrate existing data
+-- Create new model-specific metrics table
+CREATE TABLE weekly_tpy_model_metrics (
+    -- Primary key
+    week_id character varying(10),
+    model character varying(50),
+    
+    -- Hardcoded TPY metrics
+    hardcoded_stations text,
+    hardcoded_tpy numeric(5,2),
+    
+    -- Dynamic TPY metrics
+    dynamic_stations text,
+    dynamic_tpy numeric(5,2),
+    dynamic_station_count integer,
+    
+    -- Metadata
+    created_at timestamp without time zone DEFAULT now(),
+    
+    -- Constraints
+    PRIMARY KEY (week_id, model),
+    FOREIGN KEY (week_id) REFERENCES weekly_tpy_metrics(week_id) ON DELETE CASCADE
+);
+
+-- Migrate main metrics data
 INSERT INTO weekly_tpy_metrics (
     week_id,
     week_start,
@@ -70,7 +92,6 @@ INSERT INTO weekly_tpy_metrics (
     weekly_overall_yield_overall_yield,
     weekly_throughput_yield_station_metrics,
     weekly_throughput_yield_average_yield,
-    weekly_throughput_yield_model_specific,
     total_stations,
     best_station_name,
     best_station_yield,
@@ -98,30 +119,6 @@ SELECT
     weekly_overall_yield_overall_yield,
     weekly_throughput_yield_station_metrics,
     weekly_throughput_yield_average_yield,
-    jsonb_build_object(
-        'SXM4', jsonb_build_object(
-            'hardcoded', jsonb_build_object(
-                'stations', weekly_tpy_hardcoded_sxm4_stations,
-                'tpy', weekly_tpy_hardcoded_sxm4_tpy
-            ),
-            'dynamic', jsonb_build_object(
-                'stations', weekly_tpy_dynamic_sxm4_stations,
-                'tpy', weekly_tpy_dynamic_sxm4_tpy,
-                'stationCount', weekly_tpy_dynamic_sxm4_station_count
-            )
-        ),
-        'SXM5', jsonb_build_object(
-            'hardcoded', jsonb_build_object(
-                'stations', weekly_tpy_hardcoded_sxm5_stations,
-                'tpy', weekly_tpy_hardcoded_sxm5_tpy
-            ),
-            'dynamic', jsonb_build_object(
-                'stations', weekly_tpy_dynamic_sxm5_stations,
-                'tpy', weekly_tpy_dynamic_sxm5_tpy,
-                'stationCount', weekly_tpy_dynamic_sxm5_station_count
-            )
-        )
-    ) as weekly_throughput_yield_model_specific,
     total_stations,
     best_station_name,
     best_station_yield,
@@ -130,13 +127,53 @@ SELECT
     created_at
 FROM weekly_tpy_metrics_backup;
 
--- Verify the migration
+-- Migrate SXM4 data
+INSERT INTO weekly_tpy_model_metrics (
+    week_id,
+    model,
+    hardcoded_stations,
+    hardcoded_tpy,
+    dynamic_stations,
+    dynamic_tpy,
+    dynamic_station_count
+)
 SELECT 
     week_id,
-    weekly_throughput_yield_model_specific->>'SXM4' as sxm4_data,
-    weekly_throughput_yield_model_specific->>'SXM5' as sxm5_data
-FROM weekly_tpy_metrics
-LIMIT 1;
+    'Tesla SXM4',
+    weekly_tpy_hardcoded_sxm4_stations,
+    weekly_tpy_hardcoded_sxm4_tpy,
+    weekly_tpy_dynamic_sxm4_stations,
+    weekly_tpy_dynamic_sxm4_tpy,
+    weekly_tpy_dynamic_sxm4_station_count
+FROM weekly_tpy_metrics_backup
+WHERE weekly_tpy_hardcoded_sxm4_stations IS NOT NULL 
+   OR weekly_tpy_dynamic_sxm4_stations IS NOT NULL;
+
+-- Migrate SXM5 data
+INSERT INTO weekly_tpy_model_metrics (
+    week_id,
+    model,
+    hardcoded_stations,
+    hardcoded_tpy,
+    dynamic_stations,
+    dynamic_tpy,
+    dynamic_station_count
+)
+SELECT 
+    week_id,
+    'Tesla SXM5',
+    weekly_tpy_hardcoded_sxm5_stations,
+    weekly_tpy_hardcoded_sxm5_tpy,
+    weekly_tpy_dynamic_sxm5_stations,
+    weekly_tpy_dynamic_sxm5_tpy,
+    weekly_tpy_dynamic_sxm5_station_count
+FROM weekly_tpy_metrics_backup
+WHERE weekly_tpy_hardcoded_sxm5_stations IS NOT NULL 
+   OR weekly_tpy_dynamic_sxm5_stations IS NOT NULL;
+
+-- Verify the migration
+SELECT COUNT(*) as total_weeks FROM weekly_tpy_metrics;
+SELECT model, COUNT(*) as records FROM weekly_tpy_model_metrics GROUP BY model;
 
 -- If everything looks good, you can drop the backup table:
 -- DROP TABLE weekly_tpy_metrics_backup;

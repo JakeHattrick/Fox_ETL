@@ -24,6 +24,19 @@ def get_week_id(target_date):
     year, week_num, _ = target_date.isocalendar()
     return f"{year}-W{week_num:02d}"
 
+def get_week_date_range(week_id):
+    """Get start and end dates for an ISO week"""
+    year, week = week_id.split('-W')
+    year = int(year)
+    week = int(week)
+    
+    # ISO week 1 is the first week with Thursday in the new year
+    jan4 = datetime(year, 1, 4)
+    week_start = jan4 - timedelta(days=jan4.weekday()) + timedelta(weeks=week-1)
+    week_end = week_start + timedelta(days=6)
+    
+    return week_start.date(), week_end.date()
+
 def calculate_weekly_first_pass_yield_from_raw(week_start, week_end):
     """Calculate WEEKLY first pass yield using raw data"""
     conn = psycopg2.connect(**DB_CONFIG)

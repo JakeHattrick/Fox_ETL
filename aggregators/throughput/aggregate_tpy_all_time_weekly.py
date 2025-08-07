@@ -126,7 +126,7 @@ def calculate_model_specific_throughput_yields(week_start, week_end):
                     AND history_station_end_time < %s
                     AND service_flow NOT IN ('NC Sort', 'RO')
                     AND service_flow IS NOT NULL
-                    AND model IN ('Tesla SXM4', 'Tesla SXM5')
+                    AND (model IN ('Tesla SXM4', 'Tesla SXM5') OR model = 'SXM6')
                 GROUP BY model, workstation_name
                 HAVING COUNT(*) >= 1
                 ORDER BY model, total_parts DESC;
@@ -137,6 +137,7 @@ def calculate_model_specific_throughput_yields(week_start, week_end):
             model_specific_yields = {
                 "Tesla SXM4": {},
                 "Tesla SXM5": {},
+                "SXM6": {},
                 "overall": {}
             }
             
@@ -182,7 +183,8 @@ def calculate_hardcoded_tpy(model_yields):
     
     hardcoded_tpy = {
         "SXM4": {"stations": {}, "tpy": None},
-        "SXM5": {"stations": {}, "tpy": None}
+        "SXM5": {"stations": {}, "tpy": None},
+        "SXM6": {"stations": {}, "tpy": None}
     }
     
     # SXM4 formula: VI2 × ASSY2 × FI × FQC
@@ -226,6 +228,26 @@ def calculate_hardcoded_tpy(model_yields):
         hardcoded_tpy["SXM5"]["tpy"] = round(tpy_value * 100, 2)
         print(f"SXM5 Hardcoded TPY: {hardcoded_tpy['SXM5']['tpy']:.2f}%")
     
+    # SXM6 formula: BBD × ASSY2 × FI × FQC (same as SXM5)
+    sxm6_stations = ["BBD", "ASSY2", "FI", "FQC"]
+    sxm6_values = []
+    
+    for station in sxm6_stations:
+        if "SXM6" in model_yields and station in model_yields["SXM6"]:
+            yield_pct = model_yields["SXM6"][station]["throughputYield"]
+            hardcoded_tpy["SXM6"]["stations"][station] = yield_pct
+            sxm6_values.append(yield_pct / 100.0)
+            print(f"SXM6 {station}: {yield_pct:.2f}%")
+        else:
+            print(f"SXM6 {station}: NOT FOUND")
+    
+    if len(sxm6_values) == 4:
+        tpy_value = 1.0
+        for val in sxm6_values:
+            tpy_value *= val
+        hardcoded_tpy["SXM6"]["tpy"] = round(tpy_value * 100, 2)
+        print(f"SXM6 Hardcoded TPY: {hardcoded_tpy['SXM6']['tpy']:.2f}%")
+    
     return hardcoded_tpy 
 
 def calculate_dynamic_tpy(model_yields):
@@ -234,7 +256,8 @@ def calculate_dynamic_tpy(model_yields):
     
     dynamic_tpy = {
         "SXM4": {"stations": {}, "tpy": None, "stationCount": 0},
-        "SXM5": {"stations": {}, "tpy": None, "stationCount": 0}
+        "SXM5": {"stations": {}, "tpy": None, "stationCount": 0},
+        "SXM6": {"stations": {}, "tpy": None, "stationCount": 0}
     }
     
     if "Tesla SXM4" in model_yields:
@@ -259,6 +282,17 @@ def calculate_dynamic_tpy(model_yields):
         
         dynamic_tpy["SXM5"]["tpy"] = round(tpy_value * 100, 2)
         print(f"SXM5 Dynamic TPY: {dynamic_tpy['SXM5']['tpy']:.2f}% (across {dynamic_tpy['SXM5']['stationCount']} stations)")
+    
+    if "SXM6" in model_yields:
+        sxm6_stations = model_yields["SXM6"]
+        dynamic_tpy["SXM6"]["stations"] = {station: data["throughputYield"] for station, data in sxm6_stations.items()}
+        dynamic_tpy["SXM6"]["stationCount"] = len(sxm6_stations)
+        tpy_value = 1.0
+        for station, yield_pct in dynamic_tpy["SXM6"]["stations"].items():
+            tpy_value *= (yield_pct / 100.0)
+        
+        dynamic_tpy["SXM6"]["tpy"] = round(tpy_value * 100, 2)
+        print(f"SXM6 Dynamic TPY: {dynamic_tpy['SXM6']['tpy']:.2f}% (across {dynamic_tpy['SXM6']['stationCount']} stations)")
     
     return dynamic_tpy
 

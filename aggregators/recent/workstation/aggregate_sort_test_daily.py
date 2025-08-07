@@ -24,7 +24,6 @@ SELECT
   COUNT(*) AS test_count
 FROM workstation_master_log
 WHERE workstation_name = 'TEST'
-  AND history_station_passing_status = 'Pass'
   AND model IN ('Tesla SXM4', 'Tesla SXM5')
   AND history_station_end_time >= %s
   AND history_station_end_time < %s

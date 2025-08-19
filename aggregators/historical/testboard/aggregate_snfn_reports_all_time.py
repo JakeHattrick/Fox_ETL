@@ -66,9 +66,21 @@ def main():
             cur.execute(checker_command)  
             conn.commit()
 
+            try:
+                rows = cur.fetchall()
+                print(f"Current snfn_aggregate_daily has {len(rows)} rows.")
+            except psycopg2.ProgrammingError:
+                print("snfn_aggregate_daily is empty or does not exist, proceeding with aggregation.")
+
             print("Truncating snfn_aggregate_daily...")
             cur.execute(TRUNCATE_TABLE_SQL)
             conn.commit()
+
+            try:
+                rows = cur.fetchall()
+                print(f"Current snfn_aggregate_daily has {len(rows)} rows.")
+            except psycopg2.ProgrammingError:
+                print("snfn_aggregate_daily is empty or does not exist, proceeding with aggregation.")
 
             print("Checking if there are no rows after truncation")
             cur.execute(checker_command)  

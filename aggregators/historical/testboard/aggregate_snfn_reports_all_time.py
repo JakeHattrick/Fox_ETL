@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS snfn_aggregate_daily (
 '''
 TRUNCATE_TABLE_SQL = 'TRUNCATE TABLE snfn_aggregate_daily;'
 
+checker_command = "SELECT * FROM snfn_aggregate_daily LIMIT 1;"
+
 AGGREGATE_SQL = '''
 SELECT DISTINCT
     fixture_no,
@@ -64,6 +66,9 @@ def main():
             cur.execute(TRUNCATE_TABLE_SQL)
             conn.commit()
 
+            cur.execute(checker_command)  # Verify table is accessible
+            conn.commit()
+            
             print("Aggregating snfn report data from testboard_master_log...")
             cur.execute(AGGREGATE_SQL)
             rows = cur.fetchall()

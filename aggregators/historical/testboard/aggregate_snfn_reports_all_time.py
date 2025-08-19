@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS snfn_aggregate_daily (
     model TEXT NOT NULL,
     error_code TEXT NOT NULL,
     error_disc TEXT,
-    history_station_end_time DATE NOT NULL,
+    history_station_end_time TIMESTAMP NOT NULL,
     PRIMARY KEY (sn, fixture_no, model, workstation_name, error_code, history_station_end_time)
 );
 '''

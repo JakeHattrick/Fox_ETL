@@ -62,13 +62,18 @@ def main():
             cur.execute(CREATE_TABLE_SQL)
             conn.commit()
 
+            print("Checking random row in current table")
+            cur.execute(checker_command)  
+            conn.commit()
+
             print("Truncating snfn_aggregate_daily...")
             cur.execute(TRUNCATE_TABLE_SQL)
             conn.commit()
 
-            cur.execute(checker_command)  # Verify table is accessible
+            print("Checking if snfn_aggregate_daily table is accessible...")
+            cur.execute(checker_command)  
             conn.commit()
-            
+
             print("Aggregating snfn report data from testboard_master_log...")
             cur.execute(AGGREGATE_SQL)
             rows = cur.fetchall()

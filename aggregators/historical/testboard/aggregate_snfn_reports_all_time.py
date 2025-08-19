@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS snfn_aggregate_daily (
     PRIMARY KEY (sn, fixture_no, model, workstation_name, error_code, history_station_end_time)
 );
 '''
+TRUNCATE_TABLE_SQL = 'TRUNCATE TABLE snfn_aggregate_daily;'
 
 AGGREGATE_SQL = '''
 SELECT DISTINCT
@@ -57,6 +58,10 @@ def main():
         with conn.cursor() as cur:
             print("Creating snfn_aggregate_daily table if not exists...")
             cur.execute(CREATE_TABLE_SQL)
+            conn.commit()
+
+            print("Truncating snfn_aggregate_daily...")
+            cur.execute(TRUNCATE_TABLE_SQL)
             conn.commit()
 
             print("Aggregating snfn report data from testboard_master_log...")

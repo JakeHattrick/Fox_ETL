@@ -70,7 +70,7 @@ def main():
             cur.execute(TRUNCATE_TABLE_SQL)
             conn.commit()
 
-            print("Checking if snfn_aggregate_daily table is accessible...")
+            print("Checking if there are no rows after truncation")
             cur.execute(checker_command)  
             conn.commit()
 

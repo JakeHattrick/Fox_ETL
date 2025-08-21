@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS fixture_performance_daily (
     PRIMARY KEY (day, fixture_no, model, pn, workstation_name)
 );
 '''
+TRUNCATE_TABLE_SQL = 'TRUNCATE TABLE fixture_performance_daily;'
+
 
 AGGREGATE_SQL = '''
 SELECT
@@ -56,6 +58,10 @@ def main():
         with conn.cursor() as cur:
             print("Creating fixture_performance_daily table if not exists...")
             cur.execute(CREATE_TABLE_SQL)
+            conn.commit()
+
+            print("Truncating fixture_performance_daily...")
+            cur.execute(TRUNCATE_TABLE_SQL)
             conn.commit()
 
             print("Aggregating fixture performance data from testboard_master_log...")

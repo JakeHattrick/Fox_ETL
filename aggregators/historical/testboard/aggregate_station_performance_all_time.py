@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS testboard_station_performance_daily (
 );
 '''
 
+TRUNCATE_TABLE_SQL = 'TRUNCATE TABLE testboard_station_performance_daily;'
+
 AGGREGATE_SQL = '''
 SELECT
     DATE(history_station_end_time) AS end_date,
@@ -59,6 +61,10 @@ def main():
         with conn.cursor() as cur:
             print("Creating summary table with primary key if not exists...")
             cur.execute(CREATE_TABLE_SQL)
+            conn.commit()
+
+            print("truncation testboard_station_performance_daily")
+            cur.execute(TRUNCATE_TABLE_SQL)
             conn.commit()
 
             print("Aggregating all historical data from testboard_master_log...")

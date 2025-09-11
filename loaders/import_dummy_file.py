@@ -5,13 +5,17 @@ import psycopg2
 from datetime import datetime
 import re
 
+# Import config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import DATABASE
+
 def connect_to_db():
     return psycopg2.connect(
-        host="localhost",
-        database="fox_db",
-        user="gpu_user",
-        password="",
-        port="5432"
+        host=DATABASE['host'],
+        database=DATABASE['database'],
+        user=DATABASE['user'],
+        password=DATABASE['password'],
+        port=DATABASE['port']
     )
 
 def create_table_if_not_exists(cursor):

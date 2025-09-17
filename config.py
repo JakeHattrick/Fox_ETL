@@ -14,6 +14,6 @@ DATABASE = {
 #Change these to your personal settings
 # Path settings
 PATHS = {
-    'input_dir': '/home/darvin/Fox_ETL/input',
+    'input_dir': '/home/darvin.lemus/Fox_ETL/input',
     'downloads_dir': '/home/darvin/Downloads'
 }

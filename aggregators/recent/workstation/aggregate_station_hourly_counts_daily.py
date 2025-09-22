@@ -1,13 +1,9 @@
 import psycopg2
 from datetime import datetime
-
-DB_CONFIG = {
-    'host': 'localhost',
-    'database': 'fox_db',
-    'user': 'gpu_user',
-    'password': '',
-    'port': '5432'
-}
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from config import DATABASE
 
 def create_summary_table(conn):
     with conn.cursor() as cur:
@@ -23,7 +19,7 @@ def create_summary_table(conn):
     conn.commit()
 
 def aggregate_station_hourly_counts():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(**DATABASE)
     try:
         create_summary_table(conn)
         with conn.cursor() as cur:

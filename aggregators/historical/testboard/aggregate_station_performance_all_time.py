@@ -1,13 +1,9 @@
 import psycopg2
 from psycopg2.extras import execute_values
-
-DB_CONFIG = {
-    'host': 'localhost',
-    'database': 'fox_db',
-    'user': 'gpu_user',
-    'password': '',
-    'port': '5432'
-}
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from config import DATABASE
 
 CREATE_TABLE_SQL = '''
 CREATE TABLE IF NOT EXISTS testboard_station_performance_daily (
@@ -56,7 +52,7 @@ ON CONFLICT (end_date, model, work_station_process, workstation_name) DO UPDATE 
 '''
 
 def main():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(**DATABASE)
     try:
         with conn.cursor() as cur:
             print("Creating summary table with primary key if not exists...")

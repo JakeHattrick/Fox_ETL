@@ -10,6 +10,7 @@ from psycopg2.extras import execute_values
 import logging
 from datetime import datetime
 import argparse
+from config import DATABASE
 
 # Setup logging
 logging.basicConfig(
@@ -21,13 +22,7 @@ logging.info('Script started.')
 
 def connect_to_db():
     logging.info('Connecting to database...')
-    return psycopg2.connect(
-        host="localhost",
-        database="fox_db",
-        user="gpu_user",
-        password="",
-        port="5432"
-    )
+    return psycopg2.connect(**DATABASE)
 
 def create_workstation_table(conn):
     cursor = conn.cursor()

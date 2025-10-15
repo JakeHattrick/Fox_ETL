@@ -29,9 +29,9 @@ def main():
         df.columns = [clean_column_name(col) for col in df.columns]
         df['data_source'] = 'workstation'
         
-        # Clean duplicates while ignoring 'day' and 'tat' columns
+        # Clean duplicates while ignoring 'day', 'tat', and 'outbound_version' columns
         # These are metadata columns that shouldn't be used for duplicate detection
-        dedup_cols = [c for c in df.columns if c not in ['day', 'tat']]
+        dedup_cols = [c for c in df.columns if c not in ['day', 'tat', 'outbound_version']]
         original_count = len(df)
         df = df.drop_duplicates(subset=dedup_cols)
         cleaned_count = len(df)
@@ -45,7 +45,6 @@ def main():
                 'sn': str(row.get('sn', '')),
                 'pn': str(row.get('pn', '')),
                 'customer_pn': str(row.get('customer_pn', '')).strip() or None,
-                'outbound_version': str(row.get('outbound_version', '')),
                 'workstation_name': str(row.get('workstation_name', '')),
                 'history_station_start_time': pd.to_datetime(row.get('history_station_end_time')).to_pydatetime() if pd.isna(row.get('history_station_start_time')) else pd.to_datetime(row.get('history_station_start_time')).to_pydatetime() if pd.notna(row.get('history_station_start_time')) else None,
                 'history_station_end_time': pd.to_datetime(row.get('history_station_end_time')).to_pydatetime() if pd.notna(row.get('history_station_end_time')) else None,
@@ -71,7 +70,6 @@ def main():
             WHERE sn = %s 
             AND pn = %s 
             AND customer_pn = %s 
-            AND outbound_version = %s 
             AND workstation_name = %s 
             AND history_station_start_time = %s 
             AND history_station_end_time = %s 
@@ -86,7 +84,7 @@ def main():
             """
             
             check_values = (
-                row['sn'], row['pn'], row['customer_pn'], row['outbound_version'], 
+                row['sn'], row['pn'], row['customer_pn'], 
                 row['workstation_name'], row['history_station_start_time'], row['history_station_end_time'], 
                 row['hours'], row['service_flow'], row['model'], row['history_station_passing_status'], 
                 row['passing_station_method'], row['operator'], row['first_station_start_time'], row['data_source']
@@ -105,14 +103,14 @@ def main():
         if new_records:
             insert_query = """
             INSERT INTO workstation_master_log (
-                sn, pn, customer_pn, outbound_version, workstation_name,
+                sn, pn, customer_pn, workstation_name,
                 history_station_start_time, history_station_end_time, hours, service_flow, model,
                 history_station_passing_status, passing_station_method, operator, first_station_start_time, data_source
             ) VALUES %s
             """
             from psycopg2.extras import execute_values
             values = [(
-                row['sn'], row['pn'], row['customer_pn'], row['outbound_version'], row['workstation_name'],
+                row['sn'], row['pn'], row['customer_pn'], row['workstation_name'],
                 row['history_station_start_time'], row['history_station_end_time'], row['hours'], row['service_flow'], row['model'],
                 row['history_station_passing_status'], row['passing_station_method'], row['operator'], row['first_station_start_time'], row['data_source']
             ) for row in new_records]
@@ -137,4 +135,4 @@ def main():
         conn.close()
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -101,6 +101,14 @@ def main():
         print(f"Found {existing_count:,} existing records, {len(new_records):,} new records to insert")
         
         if new_records:
+            # Add detailed logging before insert
+            print(f"About to insert {len(new_records)} records...")
+            for i, row in enumerate(new_records[:3]):  # Show first 3 records
+                print(f"Record {i+1}:")
+                for key, value in row.items():
+                    print(f"  {key}: {value} (type: {type(value)})")
+                print()
+            
             insert_query = """
             INSERT INTO workstation_master_log (
                 sn, pn, model, workstation_name,
@@ -114,6 +122,15 @@ def main():
                 row['history_station_start_time'], row['history_station_end_time'], row['history_station_passing_status'], row['operator'], row['customer_pn'],
                 row['hours'], row['service_flow'], row['passing_station_method'], row['first_station_start_time'], row['data_source']
             ) for row in new_records]
+            
+            # Log the values tuple for first record
+            if values:
+                print(f"First record values tuple: {values[0]}")
+                print(f"Values tuple length: {len(values[0])}")
+                for i, val in enumerate(values[0]):
+                    print(f"  [{i}] {val} (type: {type(val)})")
+                print()
+            
             execute_values(cursor, insert_query, values)
             conn.commit()
             print(f"Imported {len(new_records):,} new records from {os.path.basename(file_path)}")

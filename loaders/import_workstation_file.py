@@ -103,16 +103,16 @@ def main():
         if new_records:
             insert_query = """
             INSERT INTO workstation_master_log (
-                sn, pn, customer_pn, workstation_name,
-                history_station_start_time, history_station_end_time, hours, service_flow, model,
-                history_station_passing_status, passing_station_method, operator, first_station_start_time, data_source
+                sn, pn, model, workstation_name,
+                history_station_start_time, history_station_end_time, history_station_passing_status, operator, customer_pn,
+                hours, service_flow, passing_station_method, first_station_start_time, data_source
             ) VALUES %s
             """
             from psycopg2.extras import execute_values
             values = [(
-                row['sn'], row['pn'], row['customer_pn'], row['workstation_name'],
-                row['history_station_start_time'], row['history_station_end_time'], row['hours'], row['service_flow'], row['model'],
-                row['history_station_passing_status'], row['passing_station_method'], row['operator'], row['first_station_start_time'], row['data_source']
+                row['sn'], row['pn'], row['model'], row['workstation_name'],
+                row['history_station_start_time'], row['history_station_end_time'], row['history_station_passing_status'], row['operator'], row['customer_pn'],
+                row['hours'], row['service_flow'], row['passing_station_method'], row['first_station_start_time'], row['data_source']
             ) for row in new_records]
             execute_values(cursor, insert_query, values)
             conn.commit()

@@ -4,7 +4,14 @@ from datetime import datetime, timedelta
 import argparse
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+# Add Fox_ETL directory to path to find config.py
+current_dir = os.path.dirname(os.path.abspath(__file__))
+while current_dir != os.path.dirname(current_dir):  # Stop at root
+    config_path = os.path.join(current_dir, 'config.py')
+    if os.path.exists(config_path):
+        sys.path.insert(0, current_dir)
+        break
+    current_dir = os.path.dirname(current_dir)
 from config import DATABASE
 
 def get_week_bounds(target_date):
@@ -41,6 +48,7 @@ def calculate_weekly_starters_for_date(target_date):
                     FROM workstation_master_log
                     WHERE service_flow NOT IN ('NC Sort', 'RO')
                         AND service_flow IS NOT NULL
+                        AND workstation_name != 'SORTING'
                     GROUP BY sn, model
                 )
                 SELECT 
@@ -111,6 +119,7 @@ def calculate_daily_completions_from_week_starters(target_date, week_starters_li
                         AND history_station_end_time < %s
                         AND service_flow NOT IN ('NC Sort', 'RO')
                         AND service_flow IS NOT NULL
+                        AND workstation_name != 'SORTING'
                     GROUP BY sn, model
                 )
                 SELECT 
@@ -181,6 +190,7 @@ def aggregate_daily_tpy_for_date(target_date):
                     AND history_station_end_time < %s
                     AND service_flow NOT IN ('NC Sort', 'RO')
                     AND service_flow IS NOT NULL
+                    AND workstation_name != 'SORTING'
                     AND (model IN ('Tesla SXM4', 'Tesla SXM5') OR model = 'SXM6')
                 GROUP BY model, workstation_name
                 HAVING COUNT(*) >= 1
@@ -246,6 +256,7 @@ def get_all_available_dates():
                 WHERE history_station_end_time IS NOT NULL
                     AND service_flow NOT IN ('NC Sort', 'RO')
                     AND service_flow IS NOT NULL
+                    AND workstation_name != 'SORTING'
                 ORDER BY test_date;
             """)
             

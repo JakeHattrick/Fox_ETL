@@ -2,7 +2,14 @@ import psycopg2
 from datetime import datetime
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+# Add Fox_ETL directory to path to find config.py
+current_dir = os.path.dirname(os.path.abspath(__file__))
+while current_dir != '/':
+    config_path = os.path.join(current_dir, 'config.py')
+    if os.path.exists(config_path):
+        sys.path.insert(0, current_dir)
+        break
+    current_dir = os.path.dirname(current_dir)
 from config import DATABASE
 
 def create_summary_table(conn):
@@ -33,6 +40,7 @@ def aggregate_station_hourly_counts():
                     workstation_master_log
                 WHERE
                     history_station_end_time IS NOT NULL
+                    AND workstation_name != 'SORTING'
                 GROUP BY
                     DATE(history_station_end_time),
                     EXTRACT(HOUR FROM history_station_end_time),

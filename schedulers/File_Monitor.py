@@ -8,7 +8,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-INPUT_DIR = "/home/darvin/Fox_ETL/input"
+INPUT_DIR = "/home/jake.hatcher/Fox_ETL/input"
 
 WORKSTATION_XLS_FILENAME = "workstationOutputReport.xls"
 TESTBOARD_XLS_FILENAME = "Test board record report.xls"

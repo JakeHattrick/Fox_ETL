@@ -1,13 +1,16 @@
 import psycopg2
 from psycopg2.extras import execute_values
-
-DB_CONFIG = {
-    'host': 'localhost',
-    'database': 'fox_db',
-    'user': 'gpu_user',
-    'password': '',
-    'port': '5432'
-}
+import sys
+import os
+# Add Fox_ETL directory to path to find config.py
+current_dir = os.path.dirname(os.path.abspath(__file__))
+while current_dir != '/':
+    config_path = os.path.join(current_dir, 'config.py')
+    if os.path.exists(config_path):
+        sys.path.insert(0, current_dir)
+        break
+    current_dir = os.path.dirname(current_dir)
+from config import DATABASE
 
 CREATE_TABLE_SQL = '''
 CREATE TABLE IF NOT EXISTS testboard_station_performance_daily (
@@ -40,6 +43,11 @@ SELECT
     ) AS failurerate
 FROM testboard_master_log
 WHERE history_station_end_time IS NOT NULL
+    AND fixture_no NOT IN ('NCS039-01', 'NCS039-02', 'NCS039-03', 'NCS039-04',
+                           'NCS040-01', 'NCS040-02', 'NCS040-03', 'NCS040-04',
+                           'NCS041-01', 'NCS041-02', 'NCS041-03', 'NCS041-04',
+                           'NCS042-01', 'NCS042-02', 'NCS042-03', 'NCS042-04',
+                           'NCS043-01', 'NCS043-02', 'NCS043-03', 'NCS043-04')
 GROUP BY end_date, model, work_station_process, workstation_name
 ORDER BY end_date DESC, model, work_station_process, workstation_name;
 '''
@@ -56,7 +64,7 @@ ON CONFLICT (end_date, model, work_station_process, workstation_name) DO UPDATE 
 '''
 
 def main():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(**DATABASE)
     try:
         with conn.cursor() as cur:
             print("Creating summary table with primary key if not exists...")

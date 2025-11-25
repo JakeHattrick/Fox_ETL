@@ -4,14 +4,12 @@ import pandas as pd
 import psycopg2
 import math
 
+# Add the parent directory to the path to import config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import DATABASE
+
 def connect_to_db():
-    return psycopg2.connect(
-        host="localhost",
-        database="fox_db",
-        user="gpu_user",
-        password="",
-        port="5432"
-    )
+    return psycopg2.connect(**DATABASE)
 
 def clean_column_name(col_name):
     return col_name.lower().replace(' ', '_').replace('-', '_')
@@ -30,15 +28,23 @@ def main():
         df = pd.read_excel(file_path)
         df.columns = [clean_column_name(col) for col in df.columns]
         df['data_source'] = 'workstation'
-        dedup_cols = [c for c in df.columns if c != 'day']
+        
+        # Clean duplicates while ignoring 'day', 'tat', and 'outbound_version' columns
+        # These are metadata columns that shouldn't be used for duplicate detection
+        dedup_cols = [c for c in df.columns if c not in ['day', 'tat', 'outbound_version']]
+        original_count = len(df)
         df = df.drop_duplicates(subset=dedup_cols)
+        cleaned_count = len(df)
+        
+        if original_count != cleaned_count:
+            print(f"Cleaned {original_count - cleaned_count:,} duplicate rows (ignoring 'day' and 'tat' columns)")
+            print(f"Original rows: {original_count:,}, Cleaned rows: {cleaned_count:,}")
         mapped_data = []
         for _, row in df.iterrows():
             mapped_row = {
                 'sn': str(row.get('sn', '')),
                 'pn': str(row.get('pn', '')),
                 'customer_pn': str(row.get('customer_pn', '')).strip() or None,
-                'outbound_version': str(row.get('outbound_version', '')),
                 'workstation_name': str(row.get('workstation_name', '')),
                 'history_station_start_time': pd.to_datetime(row.get('history_station_end_time')).to_pydatetime() if pd.isna(row.get('history_station_start_time')) else pd.to_datetime(row.get('history_station_start_time')).to_pydatetime() if pd.notna(row.get('history_station_start_time')) else None,
                 'history_station_end_time': pd.to_datetime(row.get('history_station_end_time')).to_pydatetime() if pd.notna(row.get('history_station_end_time')) else None,
@@ -64,7 +70,6 @@ def main():
             WHERE sn = %s 
             AND pn = %s 
             AND customer_pn = %s 
-            AND outbound_version = %s 
             AND workstation_name = %s 
             AND history_station_start_time = %s 
             AND history_station_end_time = %s 
@@ -79,7 +84,7 @@ def main():
             """
             
             check_values = (
-                row['sn'], row['pn'], row['customer_pn'], row['outbound_version'], 
+                row['sn'], row['pn'], row['customer_pn'], 
                 row['workstation_name'], row['history_station_start_time'], row['history_station_end_time'], 
                 row['hours'], row['service_flow'], row['model'], row['history_station_passing_status'], 
                 row['passing_station_method'], row['operator'], row['first_station_start_time'], row['data_source']
@@ -96,19 +101,36 @@ def main():
         print(f"Found {existing_count:,} existing records, {len(new_records):,} new records to insert")
         
         if new_records:
+            # Add detailed logging before insert
+            print(f"About to insert {len(new_records)} records...")
+            for i, row in enumerate(new_records[:3]):  # Show first 3 records
+                print(f"Record {i+1}:")
+                for key, value in row.items():
+                    print(f"  {key}: {value} (type: {type(value)})")
+                print()
+            
             insert_query = """
             INSERT INTO workstation_master_log (
-                sn, pn, customer_pn, outbound_version, workstation_name,
-                history_station_start_time, history_station_end_time, hours, service_flow, model,
-                history_station_passing_status, passing_station_method, operator, first_station_start_time, data_source
+                sn, pn, model, workstation_name,
+                history_station_start_time, history_station_end_time, history_station_passing_status, operator, customer_pn,
+                hours, service_flow, passing_station_method, first_station_start_time, data_source
             ) VALUES %s
             """
             from psycopg2.extras import execute_values
             values = [(
-                row['sn'], row['pn'], row['customer_pn'], row['outbound_version'], row['workstation_name'],
-                row['history_station_start_time'], row['history_station_end_time'], row['hours'], row['service_flow'], row['model'],
-                row['history_station_passing_status'], row['passing_station_method'], row['operator'], row['first_station_start_time'], row['data_source']
+                row['sn'], row['pn'], row['model'], row['workstation_name'],
+                row['history_station_start_time'], row['history_station_end_time'], row['history_station_passing_status'], row['operator'], row['customer_pn'],
+                row['hours'], row['service_flow'], row['passing_station_method'], row['first_station_start_time'], row['data_source']
             ) for row in new_records]
+            
+            # Log the values tuple for first record
+            if values:
+                print(f"First record values tuple: {values[0]}")
+                print(f"Values tuple length: {len(values[0])}")
+                for i, val in enumerate(values[0]):
+                    print(f"  [{i}] {val} (type: {type(val)})")
+                print()
+            
             execute_values(cursor, insert_query, values)
             conn.commit()
             print(f"Imported {len(new_records):,} new records from {os.path.basename(file_path)}")
@@ -130,4 +152,4 @@ def main():
         conn.close()
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -8,15 +8,10 @@ import os
 import pandas as pd
 import psycopg2
 import math
+from config import DATABASE
 
 def connect_to_db():
-    return psycopg2.connect(
-        host="localhost",
-        database="fox_db",
-        user="gpu_user",
-        password="",
-        port="5432"
-    )
+    return psycopg2.connect(**DATABASE)
 
 def clean_column_name(col_name):
     return col_name.lower().replace(' ', '_').replace('-', '_')

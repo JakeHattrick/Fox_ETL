@@ -37,7 +37,13 @@ SELECT DISTINCT
     sn,
     pn,
     model,
-    CONCAT('EC', RIGHT(failure_reasons, 3)) AS error_code,
+    CONCAT('EC', 
+        CASE 
+            WHEN RIGHT(failure_reasons, 3) = '_na' 
+                THEN LEFT(RIGHT(failure_reasons, 6), 3)
+            ELSE RIGHT(failure_reasons, 3)
+        END
+    ) AS error_code,
     failure_note AS error_disc,
     history_station_end_time
 FROM testboard_master_log
